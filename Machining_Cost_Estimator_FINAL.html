@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#0f1117"/>
+<title>Machining Cost Estimator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0f1117;--surf:#181c27;--surf2:#1e2334;--surf3:#252b3b;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --accent:#4f8ef7;--accent2:#2563eb;
+  --green:#22c55e;--orange:#f97316;--red:#ef4444;
+  --text:#e8eaf0;--text2:#8892a4;--text3:#525e72;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --r:10px;--r2:7px;--r3:4px;
+  --sb:264px;
+  --shift:40500; /* 11h 15min in seconds */
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;overscroll-behavior:none;}
+
+/* SHELL */
+.shell{display:grid;grid-template-columns:var(--sb) 1fr;min-height:100vh;}
+
+/* SIDEBAR */
+.sidebar{background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:50;}
+.sb-head{padding:20px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-logo{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px;}
+.sb-title{font-size:15px;font-weight:600;}
+.sb-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+.sb-section{padding:14px 16px 7px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;flex-shrink:0;}
+
+/* Drive */
+.drive-btn{margin:0 10px 10px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--r2);border:1px solid var(--border2);background:var(--surf2);cursor:pointer;font-size:12px;font-weight:500;color:var(--text);transition:all .15s;-webkit-tap-highlight-color:transparent;width:calc(100% - 20px);}
+.drive-btn:hover,.drive-btn:active{background:var(--surf3);border-color:var(--accent);}
+.drive-btn svg{width:15px;height:15px;flex-shrink:0;}
+.drive-status{margin:0 10px 10px;padding:7px 10px;border-radius:var(--r2);font-size:11px;display:flex;align-items:center;gap:6px;}
+.drive-status.ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);color:var(--green);}
+.drive-status.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:var(--red);}
+.drive-status.info{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.15);color:var(--accent);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+
+/* Search + parts */
+.sb-search-wrap{position:relative;margin:0 10px 8px;flex-shrink:0;}
+.sb-search-wrap input{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:var(--r2);padding:7px 10px 7px 28px;font-size:12px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;}
+.sb-search-wrap input:focus{border-color:var(--accent);}
+.sb-search-wrap::before{content:'⌕';position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none;}
+.parts-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;}
+.part-item{margin:0 8px 4px;border-radius:var(--r2);border:1px solid var(--border);background:var(--surf2);overflow:hidden;transition:border-color .15s;}
+.part-item.active{border-color:var(--accent);background:rgba(79,142,247,.06);}
+.part-inner{padding:9px 11px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.part-inner:hover{background:rgba(255,255,255,.02);}
+.part-num{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--accent);}
+.part-cust{font-size:11px;color:var(--text2);margin-top:1px;}
+.part-meta{font-size:10px;color:var(--text3);margin-top:3px;}
+.part-acts{display:flex;border-top:1px solid var(--border);}
+.pa-btn{flex:1;padding:6px;text-align:center;font-size:11px;color:var(--text3);cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent;}
+.pa-btn:hover{color:var(--text);background:rgba(255,255,255,.04);}
+.pa-btn.del:hover{color:var(--red);}
+.no-parts{padding:20px 14px;font-size:12px;color:var(--text3);text-align:center;line-height:1.7;}
+.sb-bottom{flex-shrink:0;padding:10px;border-top:1px solid var(--border);}
+.sync-btn{width:100%;padding:8px;border-radius:var(--r2);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--sans);transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.sync-btn:not(:disabled):hover{background:var(--surf3);color:var(--text);}
+.sync-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+/* MAIN */
+.main{padding:28px 32px 80px;}
+.page-hdr{margin-bottom:22px;}
+.page-hdr h1{font-size:21px;font-weight:600;letter-spacing:-.3px;}
+.page-hdr p{font-size:13px;color:var(--text2);margin-top:3px;}
+
+/* Tabs */
+.tabs{display:flex;gap:3px;margin-bottom:20px;background:var(--surf);border-radius:var(--r);padding:4px;width:fit-content;}
+.tab{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;user-select:none;}
+.tab.active{background:var(--surf3);color:var(--text);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* Cards */
+.card{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;margin-bottom:14px;}
+.card-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Fields */
+.fg{display:grid;gap:10px;margin-bottom:12px;}
+.fg.c2{grid-template-columns:1fr 1fr;}
+.fg.c3{grid-template-columns:1fr 1fr 1fr;}
+.fg.c4{grid-template-columns:repeat(4,1fr);}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;}
+.field input,.field select{background:var(--surf2);border:1px solid var(--border2);border-radius:var(--r2);padding:8px 10px;font-size:13px;color:var(--text);font-family:var(--sans);outline:none;transition:border-color .15s;-webkit-appearance:none;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--accent);}
+.field input.ro{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.18);color:#86efac;font-family:var(--mono);font-size:12px;}
+.field input::placeholder{color:var(--text3);}
+
+/* Setup */
+.setup-wrap{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;}
+.setup-hdr{background:var(--surf2);padding:11px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.setup-badge{font-family:var(--mono);font-size:10px;font-weight:500;background:var(--surf3);color:var(--accent);padding:3px 10px;border-radius:20px;border:1px solid rgba(79,142,247,.2);white-space:nowrap;}
+.setup-body{padding:14px;}
+.setup-derived{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+.sd{background:var(--surf2);border-radius:var(--r2);padding:8px 10px;border:1px solid var(--border);}
+.sd .sd-l{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+.sd .sd-v{font-family:var(--mono);font-size:13px;font-weight:500;color:#86efac;}
+
+/* Ops table */
+.ops-hdr{display:grid;grid-template-columns:1.4fr 1.1fr .85fr .85fr .75fr .75fr 22px;gap:7px;padding:0 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+.ops-hdr span{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.op-row{display:grid;grid-template-columns:1.4fr 1.1fr .85fr .85fr .75fr .75fr 22px;gap:7px;align-items:center;margin-bottom:7px;}
+.op-row input{padding:7px 8px;font-size:12px;}
+.rm-op{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;line-height:1;padding:2px;-webkit-tap-highlight-color:transparent;transition:color .12s;}
+.rm-op:hover{color:var(--red);}
+.add-op-btn{background:none;border:1px dashed var(--border2);border-radius:var(--r2);color:var(--text2);font-size:12px;padding:7px;width:100%;cursor:pointer;margin-top:6px;font-family:var(--sans);transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.add-op-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Setup total */
+.setup-total{background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.22);border-radius:var(--r2);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+.setup-total .st-lbl{font-size:11px;color:var(--orange);font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+.setup-total .st-val{font-family:var(--mono);font-size:17px;font-weight:500;color:var(--orange);}
+.rm-setup{background:none;border:1px solid rgba(239,68,68,.2);color:var(--red);border-radius:var(--r2);padding:4px 10px;font-size:11px;cursor:pointer;margin-left:auto;font-family:var(--sans);-webkit-tap-highlight-color:transparent;transition:all .12s;}
+.rm-setup:hover{background:rgba(239,68,68,.1);}
+.add-setup-btn{width:100%;padding:11px;border-radius:var(--r);border:1px dashed var(--border2);background:transparent;color:var(--text2);font-size:13px;cursor:pointer;margin-bottom:14px;font-family:var(--sans);transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.add-setup-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* Buttons */
+.btn{padding:10px 20px;border-radius:var(--r2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);border:none;display:inline-flex;align-items:center;gap:7px;transition:all .15s;-webkit-tap-highlight-color:transparent;user-select:none;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent2);}
+.btn-secondary{background:var(--surf2);color:var(--text);border:1px solid var(--border2);}
+.btn-secondary:hover{background:var(--surf3);}
+.btn-save{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.22);}
+.btn-save:hover{background:rgba(34,197,94,.18);}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+
+/* Results */
+.result-banner{background:linear-gradient(135deg,#1d4ed8,#1e40af);border-radius:var(--r);padding:18px 22px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.result-banner h2{font-size:15px;font-weight:600;}
+.rb-meta{font-size:12px;opacity:.7;margin-top:2px;}
+.grand-lbl{font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.08em;text-align:right;}
+.grand-val{font-family:var(--mono);font-size:24px;font-weight:500;text-align:right;}
+.res-setup{background:var(--surf);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;}
+.rs-hdr{background:var(--surf2);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+.rs-hdr .rn{font-weight:600;font-size:13px;}
+.rs-hdr .rt{font-family:var(--mono);color:var(--orange);font-size:13px;}
+.rs-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);}
+.rm-item .rl{font-size:10px;color:var(--text3);margin-bottom:1px;}
+.rm-item .rv{font-family:var(--mono);font-size:13px;font-weight:500;}
+table.rtbl{width:100%;border-collapse:collapse;font-size:12px;}
+table.rtbl th{padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);}
+table.rtbl td{padding:7px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;}
+table.rtbl td:first-child{font-family:var(--sans);}
+table.rtbl tr:last-child td{border-bottom:none;}
+table.rtbl .tot-row td{background:rgba(249,115,22,.08);color:var(--orange);font-weight:600;}
+
+/* Library */
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:10px;}
+.lib-card{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r);padding:14px;transition:all .15s;-webkit-tap-highlight-color:transparent;}
+.lib-card:hover{border-color:var(--accent);transform:translateY(-1px);}
+.lc-num{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--accent);}
+.lc-cust{font-size:12px;color:var(--text2);margin-top:2px;}
+.lc-info{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.6;}
+.lc-date{font-size:10px;color:var(--text3);margin-top:4px;}
+.lc-acts{display:flex;gap:6px;margin-top:10px;}
+.lc-btn{flex:1;padding:5px 8px;border-radius:var(--r3);border:1px solid var(--border2);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .12s;-webkit-tap-highlight-color:transparent;}
+.lc-btn:hover{background:var(--surf3);color:var(--text);}
+.lc-btn.del:hover{color:var(--red);border-color:rgba(239,68,68,.3);}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:16px;padding:10px 16px;border-radius:var(--r2);font-size:13px;font-weight:500;z-index:9999;opacity:0;transform:translateY(6px);transition:all .22s;pointer-events:none;max-width:280px;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.ok{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:var(--green);}
+.toast.err{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--red);}
+.toast.info{background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.3);color:var(--accent);}
+
+/* Empty */
+.empty{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty .ico{font-size:36px;margin-bottom:10px;}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Mobile */
+.mob-bar{display:none;position:fixed;top:0;left:0;right:0;height:52px;background:var(--surf);border-bottom:1px solid var(--border);z-index:200;align-items:center;padding:0 14px;gap:12px;}
+.mob-bar h1{font-size:15px;font-weight:600;flex:1;}
+.ham{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:149;}
+.overlay.show{display:block;}
+
+/* Responsive */
+@media(max-width:820px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{position:fixed;left:-284px;width:284px;height:100%;transition:left .25s cubic-bezier(.4,0,.2,1);z-index:150;top:0;}
+  .sidebar.open{left:0;box-shadow:6px 0 28px rgba(0,0,0,.45);}
+  .main{padding:68px 14px 80px;}
+  .mob-bar{display:flex;}
+  .fg.c4{grid-template-columns:1fr 1fr;}
+  .fg.c3{grid-template-columns:1fr 1fr;}
+  .setup-derived{grid-template-columns:1fr 1fr;}
+  .ops-hdr,.op-row{grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;}
+  .ops-hdr span:nth-child(n+5),.op-row>*:nth-child(n+5){display:none;}
+  .result-banner{flex-direction:column;gap:10px;}
+  .grand-val,.grand-lbl{text-align:left;}
+  .rs-meta{grid-template-columns:1fr 1fr;}
+  table.rtbl th:nth-child(n+4),table.rtbl td:nth-child(n+4){display:none;}
+  .lib-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:420px){
+  .fg.c2,.fg.c3{grid-template-columns:1fr;}
+  .lib-grid{grid-template-columns:1fr;}
+  .btn-row{flex-direction:column;}
+  .btn{width:100%;justify-content:center;}
+  .setup-hdr{gap:6px;}
+}
+@media print{
+  .mob-bar,.sidebar,.btn,.add-setup-btn,.add-op-btn,.rm-op,.rm-setup,.tabs,.toast,.overlay{display:none!important;}
+  .main{padding:0;}
+  .shell{display:block;}
+  body{background:#fff;color:#000;}
+  .card,.setup-wrap,.res-setup,.result-banner{border:1px solid #ccc!important;background:#fff!important;}
+  .sd,.setup-total{background:#f5f5f5!important;border:1px solid #ddd!important;}
+  .sd .sd-v,.setup-total .st-val,.grand-val,.rs-hdr .rt{color:#c45000!important;}
+  .field input,.field input.ro{background:#f9f9f9!important;color:#000!important;border:1px solid #ddd!important;}
+}
+</style>
+</head>
+<body>
+
+<div class="mob-bar">
+  <button class="ham" onclick="toggleMenu()" aria-label="Open menu">☰</button>
+  <h1>Machining Estimator</h1>
+</div>
+<div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+<div class="shell">
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-head">
+    <div class="sb-logo">Machining</div>
+    <div class="sb-title">Cost Estimator</div>
+    <div class="sb-sub">Shift: 11h 15min · Efficiency: 90%</div>
+  </div>
+
+  <div class="sb-section">Google Drive</div>
+  <div class="drive-status info" id="drive-status"><span class="dot"></span><span id="ds-text">Not connected</span></div>
+  <button class="drive-btn" id="driveBtn" onclick="handleAuth()">
+    <svg viewBox="0 0 24 24"><path d="M4.5 20.25L8.25 13.5H20.25L16.5 20.25H4.5Z" fill="#4285F4"/><path d="M3.75 18.75L7.5 12L11.25 18.75H3.75Z" fill="#0F9D58"/><path d="M11.25 6.75H16.5L20.25 13.5H15L11.25 6.75Z" fill="#F4B400"/><path d="M7.5 6.75L11.25 13.5H7.5L3.75 6.75H7.5Z" fill="#DB4437"/></svg>
+    <span id="driveLabel">Sign in with Google</span>
+  </button>
+
+  <div class="sb-section">Parts Library</div>
+  <div class="sb-search-wrap">
+    <input type="text" id="sbSearch" placeholder="Search parts…" oninput="renderSidebar()"/>
+  </div>
+  <div class="parts-scroll" id="partsList"></div>
+
+  <div class="sb-bottom">
+    <button class="sync-btn" id="syncBtn" onclick="syncDrive()" disabled>
+      <span id="syncIco">↻</span> Sync with Drive
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="page-hdr">
+    <h1>Cost Estimator</h1>
+    <p>Shift = 11h 15min (40,500s) · 90% efficiency · Rate per setup</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('estimator')">Estimator</div>
+    <div class="tab" onclick="switchTab('library')">Parts Library</div>
+  </div>
+
+  <!-- ESTIMATOR TAB -->
+  <div class="tab-panel active" id="tab-estimator">
+    <div class="card">
+      <div class="card-title">Job Identity</div>
+      <div class="fg c3">
+        <div class="field"><label>S.No.</label><input type="number" id="sno" placeholder="1" min="1"/></div>
+        <div class="field"><label>Customer</label><input type="text" id="customer" placeholder="e.g. CARRARO"/></div>
+        <div class="field"><label>Part Number</label><input type="text" id="partno" placeholder="e.g. 314128"/></div>
+      </div>
+      <div class="fg c2">
+        <div class="field"><label>Labor Cost / Shift (Rs)</label><input type="number" id="laborCost" placeholder="e.g. 32000" step="any" oninput="updateAllSetups()"/></div>
+        <div class="field"><label>Shift Duration</label><input type="text" value="11h 15min (40,500 s)" readonly class="ro"/></div>
+      </div>
+    </div>
+
+    <div id="setups-container"></div>
+    <button class="add-setup-btn" onclick="addSetup()">+ Add Setup / Machine</button>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="calculate()">⚡ Calculate</button>
+      <button class="btn btn-save" onclick="savePart()">
+        <span class="spin" id="save-spin" style="display:none"></span>
+        <span id="save-lbl">💾 Save to Library</span>
+      </button>
+      <button class="btn btn-secondary" onclick="resetForm()">↺ New Job</button>
+      <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
+    </div>
+
+    <div id="results" style="margin-top:22px;display:none;"></div>
+  </div>
+
+  <!-- LIBRARY TAB -->
+  <div class="tab-panel" id="tab-library">
+    <div class="card">
+      <div class="card-title">Saved Parts</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Synced to Google Drive. Tap any part to load it into the estimator.</p>
+      <div id="lib-content"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
+<script>
+// ── CONFIG — replace with your credentials ───────────────────────────────
+const CFG = {
+  CLIENT_ID: '840078659052-ueag4gtocvvd2lfvb8bic3hlnsa2c46n.apps.googleusercontent.com',
+  API_KEY:   'AIzaSyCrNgrm3NicOKcuinsysRH5qwkkiy69kk4',
+  SCOPES:    'https://www.googleapis.com/auth/drive.appdata',
+  FILE_NAME: 'machining_parts_library.json',
+};
+// ─────────────────────────────────────────────────────────────────────────
+
+// 11h 15min = 40500 seconds, 90% efficiency
+const SHIFT_SECS = 40500;
+const EFFICIENCY = 0.90;
+
+// ── SEED DATA — exact values from your Excel file ────────────────────────
+const SEED = [
+  {
+    id:'seed-1', sno:1, customer:'CARRARO', partno:'314128', laborCost:32000,
+    savedAt:'2026-01-01T00:00:00Z',
+    setups:[
+      { name:'CNC 1', machineRateHr:250, cycleTime:120, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:32,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID FINISH',insert:'VNMG 0.5', inslife:60,  insrate:450},
+      ]},
+      { name:'CNC 2', machineRateHr:250, cycleTime:90, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:85,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:90,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:94,  insrate:380},
+        {opname:'ID FINISH',insert:'CCMT 0.4', inslife:140, insrate:500},
+      ]},
+    ]
+  },
+  {
+    id:'seed-2', sno:2, customer:'OGNIBENE', partno:'107430141', laborCost:32000,
+    savedAt:'2026-01-01T00:00:00Z',
+    setups:[
+      { name:'CNC 1', machineRateHr:250, cycleTime:120, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:32,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID FINISH',insert:'VNMG 0.5', inslife:60,  insrate:450},
+      ]},
+      { name:'CNC 2', machineRateHr:250, cycleTime:96, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:85,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:90,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:94,  insrate:380},
+        {opname:'ID FINISH',insert:'CCMT 0.4', inslife:140, insrate:500},
+      ]},
+      { name:'CNC 3', machineRateHr:250, cycleTime:58, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:85,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:90,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:94,  insrate:380},
+        {opname:'ID FINISH',insert:'CCMT 0.4', inslife:140, insrate:500},
+      ]},
+      { name:'VMC 1', machineRateHr:400, cycleTime:360, ops:[
+        {opname:'MILLING', insert:'VTMG', inslife:55, insrate:600},
+      ]},
+    ]
+  },
+  {
+    id:'seed-3', sno:3, customer:'CARRARO', partno:'314129', laborCost:32000,
+    savedAt:'2026-01-01T00:00:00Z',
+    setups:[
+      { name:'CNC 1', machineRateHr:250, cycleTime:90, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:32,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:45,  insrate:380},
+        {opname:'ID FINISH',insert:'VNMG 0.5', inslife:60,  insrate:450},
+      ]},
+      { name:'CNC 2', machineRateHr:250, cycleTime:90, ops:[
+        {opname:'OD ROUGH', insert:'TNMG 0.8', inslife:85,  insrate:350},
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:90,  insrate:380},
+        {opname:'ID ROUGH', insert:'VNMG 0.4', inslife:94,  insrate:380},
+        {opname:'ID FINISH',insert:'CCMT 0.4', inslife:140, insrate:500},
+      ]},
+      { name:'CNC 3', machineRateHr:250, cycleTime:30, ops:[
+        {opname:'OD FINISH',insert:'TNMG 0.4', inslife:90,  insrate:380},
+        {opname:'ID FINISH',insert:'CCMT 0.4', inslife:140, insrate:500},
+      ]},
+    ]
+  },
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let tokenClient=null, driveFileId=null, isSignedIn=false;
+let partsLibrary=[], setupCount=0, opCounters={}, activePartId=null;
+
+// ── GOOGLE AUTH ───────────────────────────────────────────────────────────
+function initGoogle(){
+  if(CFG.CLIENT_ID.includes('YOUR_GOOGLE')){
+    setDS('info','Add your Client ID to enable Drive sync'); return;
+  }
+  gapi.load('client', async()=>{
+    await gapi.client.init({apiKey:CFG.API_KEY, discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']});
+    tokenClient = google.accounts.oauth2.initTokenClient({client_id:CFG.CLIENT_ID, scope:CFG.SCOPES, callback:onToken});
+    setDS('info','Tap "Sign in with Google" to sync');
+  });
+}
+function handleAuth(){
+  if(!tokenClient){toast('Add your Client ID first','err'); return;}
+  if(isSignedIn){signOut(); return;}
+  tokenClient.requestAccessToken({prompt:'consent'});
+}
+async function onToken(resp){
+  if(resp.error){setDS('err','Sign-in failed'); return;}
+  isSignedIn=true;
+  let email='';
+  try{const r=await gapi.client.request({path:'https://www.googleapis.com/oauth2/v3/userinfo'}); email=r.result.email||'';}catch{}
+  setDS('ok','✓ '+(email||'Connected'));
+  document.getElementById('driveLabel').textContent='Sign out';
+  document.getElementById('syncBtn').disabled=false;
+  await syncDrive();
+}
+function signOut(){
+  try{google.accounts.oauth2.revoke(gapi.client.getToken()?.access_token,()=>{});}catch{}
+  gapi.client.setToken(null);
+  isSignedIn=false; driveFileId=null;
+  setDS('info','Signed out');
+  document.getElementById('driveLabel').textContent='Sign in with Google';
+  document.getElementById('syncBtn').disabled=true;
+}
+function setDS(type,msg){
+  const el=document.getElementById('drive-status');
+  el.className='drive-status '+type;
+  document.getElementById('ds-text').textContent=msg;
+}
+
+// ── DRIVE ─────────────────────────────────────────────────────────────────
+async function syncDrive(){
+  if(!isSignedIn) return;
+  const btn=document.getElementById('syncBtn');
+  btn.innerHTML='<span class="spin"></span> Syncing…'; btn.disabled=true;
+  try{await loadFromDrive(); toast('Synced ✓','ok');}
+  catch{toast('Sync failed','err');}
+  btn.innerHTML='<span>↻</span> Sync with Drive'; btn.disabled=false;
+}
+async function findOrCreate(){
+  const list=await gapi.client.drive.files.list({spaces:'appDataFolder',fields:'files(id)',q:`name='${CFG.FILE_NAME}'`});
+  if(list.result.files.length) driveFileId=list.result.files[0].id;
+  else{const c=await gapi.client.drive.files.create({resource:{name:CFG.FILE_NAME,parents:['appDataFolder']},fields:'id'}); driveFileId=c.result.id;}
+  return driveFileId;
+}
+async function loadFromDrive(){
+  await findOrCreate();
+  try{const r=await gapi.client.drive.files.get({fileId:driveFileId,alt:'media'}); partsLibrary=JSON.parse(r.body||'[]');}
+  catch{partsLibrary=[];}
+  mergeSeed();
+  localStorage.setItem('mach_parts',JSON.stringify(partsLibrary));
+  renderSidebar(); renderLibrary();
+}
+async function saveToDrive(){
+  if(!isSignedIn) return false;
+  await findOrCreate();
+  await gapi.client.request({path:`/upload/drive/v3/files/${driveFileId}`,method:'PATCH',params:{uploadType:'media'},headers:{'Content-Type':'application/json'},body:JSON.stringify(partsLibrary)});
+  return true;
+}
+function mergeSeed(){
+  SEED.forEach(s=>{ if(!partsLibrary.find(p=>p.id===s.id)) partsLibrary.push(s); });
+}
+
+// ── FORM HELPERS ──────────────────────────────────────────────────────────
+const gv = id => parseFloat(document.getElementById(id)?.value)||0;
+const gs = id => document.getElementById(id)?.value?.trim()||'';
+
+function addSetup(data){
+  setupCount++;
+  const sid=setupCount;
+  opCounters[sid]=0;
+  const wrap=document.createElement('div');
+  wrap.className='setup-wrap'; wrap.id='setup-'+sid;
+  const IS="background:var(--surf2);border:1px solid var(--border2);border-radius:var(--r2);padding:7px 9px;font-size:13px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;";
+  wrap.innerHTML=`
+  <div class="setup-hdr">
+    <span class="setup-badge">Setup ${sid}</span>
+    <div style="display:flex;align-items:center;gap:6px;flex:1;">
+      <label style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Machine</label>
+      <input type="text" id="sname-${sid}" placeholder="e.g. CNC ${sid}" style="${IS}max-width:110px;" value="${data?.name||''}"/>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Rate (Rs/hr)</label>
+      <input type="number" id="smrate-${sid}" placeholder="250" step="any" style="${IS}max-width:80px;" value="${data?.machineRateHr||''}" oninput="updateSetup(${sid})"/>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;">Cycle (s)</label>
+      <input type="number" id="cycle-${sid}" placeholder="120" step="any" style="${IS}max-width:70px;" value="${data?.cycleTime||''}" oninput="updateSetup(${sid})"/>
+    </div>
+    <button class="rm-setup" onclick="removeSetup(${sid})">✕</button>
+  </div>
+  <div class="setup-body">
+    <div class="setup-derived">
+      <div class="sd"><div class="sd-l">Rate (Rs/s)</div><div class="sd-v" id="rps-${sid}">—</div></div>
+      <div class="sd"><div class="sd-l">Per Job Machine (Rs)</div><div class="sd-v" id="pjm-${sid}">—</div></div>
+      <div class="sd"><div class="sd-l">Jobs / Shift (90%)</div><div class="sd-v" id="jps-${sid}">—</div></div>
+      <div class="sd"><div class="sd-l">Per Job Labor (Rs)</div><div class="sd-v" id="pjl-${sid}">—</div></div>
+    </div>
+    <div class="ops-hdr">
+      <span>Operation</span><span>Insert</span><span>Life (jobs)</span>
+      <span>Rate (Rs)</span><span>Consumption</span><span>Cost/Job (Rs)</span><span></span>
+    </div>
+    <div id="ops-${sid}"></div>
+    <button class="add-op-btn" onclick="addOp(${sid})">+ Add Operation</button>
+    <div class="setup-total">
+      <span class="st-lbl">Setup ${sid} — Total / Job</span>
+      <span class="st-val" id="stot-${sid}">₹0.00</span>
+    </div>
+  </div>`;
+  document.getElementById('setups-container').appendChild(wrap);
+  if(data?.ops?.length) data.ops.forEach(op=>addOp(sid,op));
+  else{ addOp(sid); addOp(sid); }
+  if(data) updateSetup(sid);
+}
+
+function removeSetup(sid){ document.getElementById('setup-'+sid)?.remove(); }
+
+function addOp(sid, data){
+  opCounters[sid]=(opCounters[sid]||0)+1;
+  const oid=opCounters[sid];
+  const list=document.getElementById('ops-'+sid);
+  const div=document.createElement('div');
+  div.className='op-row'; div.id=`op-${sid}-${oid}`;
+  const iS="background:var(--surf2);border:1px solid var(--border2);border-radius:var(--r2);padding:7px 8px;font-size:12px;color:var(--text);font-family:var(--sans);outline:none;-webkit-appearance:none;width:100%;";
+  const rS="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.18);border-radius:var(--r2);padding:7px 8px;font-size:12px;color:#86efac;font-family:var(--mono);width:100%;";
+  const life=data?.inslife||'', rate=data?.insrate||'';
+  const cons=life>0?(1/life).toFixed(4):'—';
+  const cpj=(life>0&&rate>0)?'₹'+((1/life)*rate).toFixed(4):'—';
+  div.innerHTML=`
+    <div class="field"><input type="text"   id="opname-${sid}-${oid}" placeholder="OD ROUGH" style="${iS}" value="${data?.opname||''}"  oninput="calcOp(${sid},${oid})"/></div>
+    <div class="field"><input type="text"   id="insert-${sid}-${oid}" placeholder="TNMG 0.8" style="${iS}" value="${data?.insert||''}"/></div>
+    <div class="field"><input type="number" id="inslife-${sid}-${oid}" placeholder="32"       style="${iS}" value="${life}" step="any"    oninput="calcOp(${sid},${oid})"/></div>
+    <div class="field"><input type="number" id="insrate-${sid}-${oid}" placeholder="350"      style="${iS}" value="${rate}" step="any"    oninput="calcOp(${sid},${oid})"/></div>
+    <div class="field"><input type="text"   id="cons-${sid}-${oid}"   readonly                style="${rS}" value="${cons}"/></div>
+    <div class="field"><input type="text"   id="cpj-${sid}-${oid}"    readonly                style="${rS}" value="${cpj}"/></div>
+    <button class="rm-op" onclick="removeOp(${sid},${oid})" title="Remove">✕</button>`;
+  list.appendChild(div);
+}
+
+function removeOp(sid,oid){ document.getElementById(`op-${sid}-${oid}`)?.remove(); updateSetup(sid); }
+
+function calcOp(sid,oid){
+  const life=gv(`inslife-${sid}-${oid}`), rate=gv(`insrate-${sid}-${oid}`);
+  const cons=life>0?1/life:0, cpj=cons*rate;
+  const ce=document.getElementById(`cons-${sid}-${oid}`), pe=document.getElementById(`cpj-${sid}-${oid}`);
+  if(ce) ce.value=life>0?cons.toFixed(4):'—';
+  if(pe) pe.value=life>0?'₹'+cpj.toFixed(4):'—';
+  updateSetup(sid);
+}
+
+function updateSetup(sid){
+  const mrHr=gv(`smrate-${sid}`), lc=gv('laborCost'), cycle=gv(`cycle-${sid}`);
+  // SHIFT: 11h 15min = 40500s, efficiency 90%
+  const mrS=mrHr/3600;
+  const pjM=mrS*cycle;
+  const jps=cycle>0?Math.floor(SHIFT_SECS*EFFICIENCY/cycle):0;
+  const pjL=jps>0?lc/jps:0;
+  const el=id=>document.getElementById(id);
+  if(el(`rps-${sid}`))  el(`rps-${sid}`).textContent  = mrHr>0?mrS.toFixed(5):'—';
+  if(el(`pjm-${sid}`))  el(`pjm-${sid}`).textContent  = cycle>0?'₹'+pjM.toFixed(2):'—';
+  if(el(`jps-${sid}`))  el(`jps-${sid}`).textContent  = cycle>0?jps:'—';
+  if(el(`pjl-${sid}`))  el(`pjl-${sid}`).textContent  = jps>0?'₹'+pjL.toFixed(2):'—';
+  let ins=0;
+  document.querySelectorAll(`[id^="cpj-${sid}-"]`).forEach(e=>{
+    const n=parseFloat(e.value.replace('₹',''));
+    if(!isNaN(n)) ins+=n;
+  });
+  if(el(`stot-${sid}`)) el(`stot-${sid}`).textContent='₹'+(pjM+pjL+ins).toFixed(2);
+}
+
+function updateAllSetups(){
+  for(let i=1;i<=setupCount;i++) if(document.getElementById('setup-'+i)) updateSetup(i);
+}
+
+function collectForm(){
+  const setups=[];
+  document.querySelectorAll('[id^="setup-"]').forEach(el=>{
+    const sid=el.id.replace('setup-','');
+    if(!document.getElementById('sname-'+sid)) return; // skip removed
+    const ops=[];
+    document.querySelectorAll(`[id^="opname-${sid}-"]`).forEach(inp=>{
+      const oid=inp.id.replace(`opname-${sid}-`,'');
+      ops.push({opname:inp.value||'', insert:document.getElementById(`insert-${sid}-${oid}`)?.value||'',
+        inslife:gv(`inslife-${sid}-${oid}`), insrate:gv(`insrate-${sid}-${oid}`)});
+    });
+    setups.push({name:document.getElementById(`sname-${sid}`)?.value||`Setup ${sid}`,
+      machineRateHr:gv(`smrate-${sid}`), cycleTime:gv(`cycle-${sid}`), ops});
+  });
+  return{sno:gs('sno'), customer:gs('customer'), partno:gs('partno'), laborCost:gv('laborCost'), setups};
+}
+
+function loadForm(data){
+  ['sno','customer','partno','laborCost'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value=data[id]||'';
+  });
+  document.getElementById('setups-container').innerHTML='';
+  setupCount=0; opCounters={};
+  (data.setups||[]).forEach(s=>addSetup(s));
+  updateAllSetups();
+}
+
+// ── CALCULATE ─────────────────────────────────────────────────────────────
+function calculate(){
+  const data=collectForm();
+  if(!data.setups.length){toast('Add at least one setup','err'); return;}
+  let allS=[], grand=0;
+  data.setups.forEach(s=>{
+    const mrS=s.machineRateHr/3600;
+    const pjM=mrS*s.cycleTime;
+    const jps=s.cycleTime>0?Math.floor(SHIFT_SECS*EFFICIENCY/s.cycleTime):0;
+    const pjL=jps>0?data.laborCost/jps:0;
+    let ins=0;
+    const ops=s.ops.map(op=>{
+      const cons=op.inslife>0?1/op.inslife:0, cpj=cons*op.insrate;
+      ins+=cpj;
+      return{...op,cons:cons.toFixed(4),cpj:cpj.toFixed(4)};
+    });
+    const total=pjM+pjL+ins; grand+=total;
+    allS.push({...s,mrS,pjM,jps,pjL,ins,total,ops});
+  });
+
+  let html=`
+  <div class="result-banner">
+    <div>
+      <h2>${data.customer||'—'} &nbsp;/&nbsp; ${data.partno||'—'}</h2>
+      <div class="rb-meta">Labor ₹${data.laborCost}/shift &nbsp;·&nbsp; Shift 11h 15min &nbsp;·&nbsp; Eff. 90%</div>
+    </div>
+    <div>
+      <div class="grand-lbl">Grand Total / Job</div>
+      <div class="grand-val">₹${grand.toFixed(2)}</div>
+    </div>
+  </div>`;
+
+  allS.forEach((s,i)=>{
+    html+=`
+    <div class="res-setup">
+      <div class="rs-hdr">
+        <span class="rn">Setup ${i+1} — ${s.name} &nbsp;(₹${s.machineRateHr}/hr)</span>
+        <span class="rt">₹${s.total.toFixed(2)}</span>
+      </div>
+      <div class="rs-meta">
+        <div class="rm-item"><div class="rl">Cycle time</div><div class="rv">${s.cycleTime} s</div></div>
+        <div class="rm-item"><div class="rl">Jobs / shift</div><div class="rv">${s.jps}</div></div>
+        <div class="rm-item"><div class="rl">Machine / job</div><div class="rv">₹${s.pjM.toFixed(2)}</div></div>
+        <div class="rm-item"><div class="rl">Labor / job</div><div class="rv">₹${s.pjL.toFixed(2)}</div></div>
+      </div>
+      <table class="rtbl">
+        <thead><tr><th>Operation</th><th>Insert</th><th>Life</th><th>Rate (Rs)</th><th>Consumption</th><th>Cost/Job (Rs)</th></tr></thead>
+        <tbody>
+          ${s.ops.map(op=>`<tr>
+            <td>${op.opname||'—'}</td><td>${op.insert||'—'}</td>
+            <td>${op.inslife}</td><td>₹${op.insrate}</td>
+            <td>${op.cons}</td><td>₹${op.cpj}</td>
+          </tr>`).join('')}
+          <tr class="tot-row">
+            <td colspan="5" style="text-align:right;font-family:var(--sans);">Insert + Machine + Labor</td>
+            <td>₹${s.total.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+  });
+
+  const rd=document.getElementById('results');
+  rd.innerHTML=html; rd.style.display='block';
+  rd.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function resetForm(){
+  if(!confirm('Clear the current form?')) return;
+  ['sno','customer','partno','laborCost'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('setups-container').innerHTML='';
+  document.getElementById('results').style.display='none';
+  setupCount=0; opCounters={}; activePartId=null;
+  addSetup(); renderSidebar();
+}
+
+// ── LIBRARY ───────────────────────────────────────────────────────────────
+async function savePart(){
+  const data=collectForm();
+  if(!data.customer&&!data.partno){toast('Enter customer or part number','err'); return;}
+  document.getElementById('save-spin').style.display='inline-block';
+  document.getElementById('save-lbl').textContent='Saving…';
+  const entry={...data, id:activePartId||Date.now().toString(), savedAt:new Date().toISOString()};
+  if(activePartId){
+    const idx=partsLibrary.findIndex(p=>p.id===activePartId);
+    if(idx>=0) partsLibrary[idx]=entry; else partsLibrary.push(entry);
+  } else {
+    partsLibrary.push(entry);
+    activePartId=entry.id;
+  }
+  localStorage.setItem('mach_parts',JSON.stringify(partsLibrary));
+  let synced=false;
+  if(isSignedIn){try{await saveToDrive(); synced=true;}catch{toast('Drive save failed','err');}}
+  document.getElementById('save-spin').style.display='none';
+  document.getElementById('save-lbl').textContent='💾 Save to Library';
+  toast(synced?'Saved to Drive ✓':'Saved locally (sign in to sync)', synced?'ok':'info');
+  renderSidebar(); renderLibrary();
+}
+
+function loadPart(id){
+  const p=partsLibrary.find(p=>p.id===id);
+  if(!p) return;
+  activePartId=id;
+  loadForm(p);
+  switchTab('estimator');
+  document.getElementById('results').style.display='none';
+  toast(`Loaded: ${p.partno||p.customer}`,'ok');
+  renderSidebar();
+  if(window.innerWidth<=820) closeSidebar();
+}
+
+async function deletePart(id){
+  if(!confirm('Delete this part from the library?')) return;
+  partsLibrary=partsLibrary.filter(p=>p.id!==id);
+  localStorage.setItem('mach_parts',JSON.stringify(partsLibrary));
+  if(isSignedIn){try{await saveToDrive();}catch{}}
+  if(activePartId===id) activePartId=null;
+  renderSidebar(); renderLibrary();
+  toast('Deleted','info');
+}
+
+function renderSidebar(){
+  const q=(document.getElementById('sbSearch')?.value||'').toLowerCase();
+  const list=document.getElementById('partsList');
+  const filtered=partsLibrary.filter(p=>(p.partno||'').toLowerCase().includes(q)||(p.customer||'').toLowerCase().includes(q));
+  if(!filtered.length){
+    list.innerHTML=`<div class="no-parts">${q?'No matches found':'No saved parts yet'}</div>`; return;
+  }
+  list.innerHTML=filtered.map(p=>`
+    <div class="part-item${activePartId===p.id?' active':''}" id="sbi-${p.id}">
+      <div class="part-inner" onclick="loadPart('${p.id}')">
+        <div class="part-num">${p.partno||'—'}</div>
+        <div class="part-cust">${p.customer||'—'}</div>
+        <div class="part-meta">${p.setups?.length||0} setup(s) · S.No. ${p.sno||'—'}</div>
+      </div>
+      <div class="part-acts">
+        <div class="pa-btn" onclick="loadPart('${p.id}')">Load</div>
+        <div class="pa-btn del" onclick="deletePart('${p.id}')">Delete</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderLibrary(){
+  const el=document.getElementById('lib-content');
+  if(!partsLibrary.length){
+    el.innerHTML=`<div class="empty"><div class="ico">📂</div><p>No saved parts yet.<br>Fill the form and click Save to Library.</p></div>`; return;
+  }
+  el.innerHTML=`<div class="lib-grid">${partsLibrary.map(p=>`
+    <div class="lib-card">
+      <div class="lc-num">${p.partno||'—'}</div>
+      <div class="lc-cust">${p.customer||'—'}</div>
+      <div class="lc-info">${p.setups?.length||0} setup(s)<br>Labor ₹${p.laborCost||0}/shift</div>
+      <div class="lc-date">${p.savedAt?new Date(p.savedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):''}</div>
+      <div class="lc-acts">
+        <button class="lc-btn" onclick="loadPart('${p.id}')">Load</button>
+        <button class="lc-btn del" onclick="deletePart('${p.id}')">Delete</button>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+// ── UI ────────────────────────────────────────────────────────────────────
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['estimator','library'][i]===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name)?.classList.add('active');
+  if(name==='library') renderLibrary();
+}
+function toggleMenu(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+let toastT;
+function toast(msg,type='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast show '+type;
+  clearTimeout(toastT); toastT=setTimeout(()=>{el.className='toast '+type;},3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+window.onload=()=>{
+  try{const loc=localStorage.getItem('mach_parts'); if(loc) partsLibrary=JSON.parse(loc);}catch{}
+  mergeSeed();
+  localStorage.setItem('mach_parts',JSON.stringify(partsLibrary));
+  renderSidebar();
+  addSetup();
+  initGoogle();
+};
+</script>
+</body>
+</html>
